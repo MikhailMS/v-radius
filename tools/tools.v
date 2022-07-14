@@ -2,7 +2,6 @@ module tools
 
 import arrays
 import crypto.md5
-import math.big
 
 // Converts IPv6 Address string into vector of bytes
 //
@@ -81,28 +80,48 @@ pub fn bytes_to_ipv4_string(ipv4 []u8) ?string {
 //
 // Should be used for any Attribute of type **integer** to ensure value is encoded correctly
 pub fn integer_to_bytes(integer u32) []u8 {
-    // bytes() returns in big endian order
-    tmp      := big.integer_from_u32(integer)
-    bytes, _ := tmp.bytes()
-    return bytes
+    b1 := u8((integer >> 24) & 0xff)
+    b2 := u8((integer >> 16) & 0xff)
+    b3 := u8((integer >> 8) & 0xff)
+    b4 := u8(integer & 0xff)
+
+    return [b1, b2, b3, b4]
 }
 
 // Converts integer bytes into u32
 pub fn bytes_to_integer(integer []u8) u32 {
-    return big.integer_from_bytes(integer)
+    mut result := u32(0)
+    for i in 0..4 {
+        result = (result << 8) | integer[i]
+    }
+
+    return result
 }
 
 // Converts timestamp (u64) into vector of bytes
 //
 // Should be used for any Attribute of type **date** to ensure value is encoded correctly
 pub fn timestamp_to_bytes(timestamp u64) []u8 {
-    // bytes() returns in big endian order
-    return timestamp.bytes()
+    b1 := u8((timestamp >> 56) & 0xff)
+    b2 := u8((timestamp >> 48) & 0xff)
+    b3 := u8((timestamp >> 40) & 0xff)
+    b4 := u8((timestamp >> 32) & 0xff)
+    b5 := u8((timestamp >> 24) & 0xff)
+    b6 := u8((timestamp >> 16) & 0xff)
+    b7 := u8((timestamp >> 8) & 0xff)
+    b8 := u8(timestamp & 0xff)
+
+    return [b1, b2, b3, b4, b5, b6, b7, b8]
 }
 
 // Converts timestamp bytes into u64
 pub fn bytes_to_timestamp(timestamp []u8) u64 {
-    return big.integer_from_bytes(timestamp)
+    mut result := u64(0)
+    for i in 0..8 {
+        result = (result << 8) | timestamp[i]
+    }
+
+    return result
 }
 
 // Encrypts data since RADIUS packet is sent in plain text
@@ -120,26 +139,23 @@ pub fn encrypt_data(data []u8, authenticator []u8, secret []u8) []u8 {
     *
     * Step 3. Return result vector
     */
-    mut hash := [16]u8{}
-    padding  := 16 - data.len() % 16
+    mut hash := []u8{len: 16, cap: 16}
+    padding  := 16 - data.len % 16
 
-    mut result := [data.len() + padding]u8{}
-    result << data
-    result << hash[..padding]
+    mut initial_data := []u8{cap: data.len + padding}
+    mut result       := []u8{cap: data.len + padding}
+    initial_data << data
+    initial_data << hash[..padding]
 
-    prev_result := authenticator
-    //current     := result.as_mut_slice();
-
-
-    encrypt_helper(mut result, &prev_result, mut hash, secret)
+    encrypt_helper(mut result, mut initial_data, authenticator.clone(), mut hash, secret)
 
     return result
 }
 
-/// Decrypts data since RADIUS packet is sent in plain text
-///
-/// Should be used to decrypt value of **User-Password** attribute (but could also be used to
-/// decrypt any data)
+// Decrypts data since RADIUS packet is sent in plain text
+//
+// Should be used to decrypt value of **User-Password** attribute (but could also be used to
+// decrypt any data)
 pub fn decrypt_data(data []u8, authenticator []u8, secret []u8) []u8 {
     /* 
      * To decrypt the data, we need to apply the same algorithm as in encrypt_data()
@@ -151,57 +167,59 @@ pub fn decrypt_data(data []u8, authenticator []u8, secret []u8) []u8 {
      *   3. execute bitwise XOR between each of 16 elements of MD5 hash and data buffer and record it in results vector
      *
      */
-    mut result      := [data.len()]u8{}
-    mut prev_result := authenticator
-    mut hash        := [16]u8{}
+    mut result      := []u8{cap: data.len}
+    mut hash        := []u8{len: 16, cap: 16}
+    mut prev_result := authenticator.clone()
 
     for data_chunk in arrays.chunk(data, 16) {
         mut md5  := md5.new()
-        md5.write(secret)
-        md5.write(prev_result)
-        hash << md5.checksum()
+        md5.write(secret) or {}
+        md5.write(prev_result) or {}
+
+        hash = md5.checksum()
 
         for i in 0..16 {
           hash[i] ^= data_chunk[i]
         }
 
         result << hash
-        prev_result = data_chunk
+        prev_result = data_chunk.clone()
     }
 
     for {
         result.pop()
-        if result[result.len()-1] == 0 { break }
+        if result[result.len-1] != 0 { break }
     }
 
     return result
 }
 
-/// Encrypts data with salt since RADIUS packet is sent in plain text
-///
-/// Should be used for RADIUS Tunnel-Password Attribute
+// Encrypts data with salt since RADIUS packet is sent in plain text
+//
+// Should be used for RADIUS Tunnel-Password Attribute
 pub fn salt_encrypt_data(data []u8, authenticator []u8, salt []u8, secret []u8) []u8 {
-    if data.len() == 0 {
+    if data.len == 0 {
         return []u8{}
     }
 
-    mut hash   := [16]u8{}
-    padding    := 15 - data.len() % 16
-    mut result := [data.len() + 3 + padding]u8{} // make buffer big enough to fit the salt & encrypted data
+    padding := 15 - data.len % 16
+
+    mut salted_authenticator := []u8{cap: 18}
+    mut hash                 := []u8{len: 16, cap: 16}
+    mut result               := []u8{cap: data.len + padding} // make buffer big enough to fit the salt & encrypted data
+    mut initial_data         := []u8{cap: data.len + padding}
 
     result << salt
-    result << data.len()
-    result << data
-    result << hash[..padding]
 
-    mut salted_authenticator := [18]u8{}
+    initial_data << salt
+    initial_data << u8(data.len)
+    initial_data << data
+    initial_data << hash[..padding]
+
     salted_authenticator << authenticator
     salted_authenticator << salt
 
-    prev_result := &salted_authenticator
-    mut current := result[2..]
-
-    encrypt_helper(current, prev_result, &mut hash, secret)
+    encrypt_helper(mut result, mut initial_data[2..], salted_authenticator, mut hash, secret)
 
     return result
 }
@@ -214,40 +232,40 @@ pub fn salt_decrypt_data(data []u8, authenticator []u8, secret []u8) ?[]u8 {
      * The salt decryption behaves almost the same as normal Password encryption in RADIUS
      * The main difference is the presence of a two byte salt, which is appended to the authenticator
      */
-    if data.len() <= 1 {
+    if data.len <= 1 {
         return error('salt encrypted attribute too short')
     }
-    if data.len() <= 3 {
+    if data.len <= 3 {
         // There is a Salt or there is a salt & data.len(): Both cases mean "Password is empty"
         return []u8{}
     }
 
-    mut salted_authenticator := [18]u8{}
+    mut salted_authenticator := []u8{cap: 18}
     salted_authenticator << authenticator
     salted_authenticator << data[..2]
 
-    mut hash        := [16]u8{}
-    mut result      := [data.len()-2]u8{}
-    mut prev_result := salted_authenticator
+    mut result      := []u8{cap: data.len-2}
+    mut hash        := []u8{len: 16, cap: 16}
+    mut prev_result := salted_authenticator.clone()
 
     for data_chunk in arrays.chunk(data[2..], 16) {
         mut md5 := md5.new()
         md5.write(secret)  or { 0 }
         md5.write(prev_result) or { 0 }
-        hash << md5.checksum()
+        hash = md5.checksum()
 
         for i in 0..16 {
           hash[i] ^= data_chunk[i]
         }
 
         result << hash
-        prev_result = data_chunk
+        prev_result = data_chunk.clone()
     }
 
     target_len := result.first()
     result.delete(0)
 
-    if target_len > data.len() - 3 {
+    if target_len > data.len - 3 {
         return error('Tunnel Password is too long (shared secret might be wrong)')
     }
 
@@ -256,21 +274,37 @@ pub fn salt_decrypt_data(data []u8, authenticator []u8, secret []u8) ?[]u8 {
 }
 
 // -----------------------------------------
-fn encrypt_helper(data []u8, mut result []u8, mut hash []u8, secret []u8) {
+fn encrypt_helper(mut output []u8, mut data []u8, authenticator []u8, mut hash []u8, secret []u8) {
+    mut iteration := 1
+    mut tmp       := []u8{}
+
     for {
         mut md5 := md5.new()
         md5.write(secret) or { 0 }
-        md5.write(result) or { 0 }
-        hash << md5.checksum()
+        if iteration == 1 {
+          md5.write(authenticator) or { 0 }
+        } else {
+          md5.write(tmp) or { 0 }
+        }
+        hash = md5.checksum()
+
+        iteration += 1
 
         for i in 0..16 {
           data[i] ^= hash[i]
         }
 
-        result = data[..16]
-        data   = data[16..]
+        if data.len == 16 {
+          output << data[..16]
+          tmp = data[..16]
+          data.clear()
+        } else {
+          output << data[..16]
+          tmp = data[..16]
+          data   = data[16..]
+        }
 
-        if data.len() != 0 { break }
+        if data.len == 0 { break }
     }
 }
 
