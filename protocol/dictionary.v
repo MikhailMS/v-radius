@@ -33,7 +33,7 @@ pub struct DictionaryAttribute {
      */
     name        string
     vendor_name string
-    code        u16
+    code        u8
     code_type   SupportedAttributeTypes
 }
 
@@ -64,7 +64,7 @@ pub fn (dict_attr DictionaryAttribute) name() string {
     return dict_attr.name
 }
 
-pub fn (dict_attr DictionaryAttribute) code() u16 {
+pub fn (dict_attr DictionaryAttribute) code() u8 {
     return dict_attr.code
 }
 
@@ -151,7 +151,7 @@ fn parse_attribute(parsed_line []string, vendor_name string, mut attributes []Di
     attributes << DictionaryAttribute {
         name:        parsed_line[1]
         vendor_name: vendor_name
-        code:        parsed_line[2].u16()
+        code:        parsed_line[2].u8()
         code_type:   assign_attribute_type(parsed_line[3]) or { return }
     }
 }

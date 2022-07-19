@@ -6,7 +6,7 @@ import crypto.md5
 // Converts IPv6 Address string into vector of bytes
 //
 // Should be used for any Attribute of type **ipv6addr** or **ipv6prefix** to ensure value is encoded correctly
-// pub fn ipv6_string_to_bytes(ipv6 string) ?[]u8 {
+pub fn ipv6_string_to_bytes(ipv6 string) ?[]u8 {
 //     parsed_ipv6 := ipv6.split("/")
 //     mut bytes   := [18]u8
 //     ipv6_address           = Ipv6Addr::from_str(parsed_ipv6[0]).map_err(|error| RadiusError::MalformedIpAddrError { error: error.to_string() })?;
@@ -16,10 +16,12 @@ import crypto.md5
 //     }
 //     bytes.append(&mut ipv6_address.octets().to_vec());
 //     Ok(bytes)
-// }
+    return [u8(0)]
+}
+
 
 // Converts IPv6 bytes into IPv6 string
-// pub fn bytes_to_ipv6_string(ipv6 []u8) ?string {
+pub fn bytes_to_ipv6_string(ipv6 []u8) ?string {
 //     if ipv6.len() == 18 {
 //         // Case with subnet
 //         let subnet = u16_from_be_bytes(&ipv6[0..2]);
@@ -47,7 +49,9 @@ import crypto.md5
 //             u16_from_be_bytes(&ipv6[14..]),
 //             ).to_string())
 //     }
-// }
+    return ""
+}
+
 
 // Converts IPv4 Address string into vector of bytes
 //
@@ -89,7 +93,7 @@ pub fn integer_to_bytes(integer u32) []u8 {
 }
 
 // Converts integer bytes into u32
-pub fn bytes_to_integer(integer []u8) u32 {
+pub fn bytes_to_integer(integer []u8) ?u32 {
     mut result := u32(0)
     for i in 0..4 {
         result = (result << 8) | integer[i]
@@ -115,7 +119,7 @@ pub fn timestamp_to_bytes(timestamp u64) []u8 {
 }
 
 // Converts timestamp bytes into u64
-pub fn bytes_to_timestamp(timestamp []u8) u64 {
+pub fn bytes_to_timestamp(timestamp []u8) ?u64 {
     mut result := u64(0)
     for i in 0..8 {
         result = (result << 8) | timestamp[i]
