@@ -42,17 +42,17 @@ pub fn (mut host Host) set_port(msg_type RadiusMsgType, port u16) {
 }
 
 // Creates RadiusAttribute with given name (name is checked against Dictionary)
-pub fn (host Host) create_attribute_by_name(attribute_name string, value []u8) ?RadiusAttribute {
+pub fn (host Host) create_attribute_by_name(attribute_name string, value []u8) !RadiusAttribute {
     return create_radius_attribute_by_name(host.dictionary, attribute_name, value)
 }
 
 // Creates RadiusAttribute with given id (id is checked against Dictionary)
-pub fn (host Host) create_attribute_by_id(attribute_id u8, value []u8) ?RadiusAttribute {
+pub fn (host Host) create_attribute_by_id(attribute_id u8, value []u8) !RadiusAttribute {
     return create_radius_attribute_by_id(host.dictionary, attribute_id, value)
 }
 
 // Returns port of RADIUS server, that receives given type of RADIUS message/packet
-pub fn (host Host) port(code TypeCode) ?u16 {
+pub fn (host Host) port(code TypeCode) !u16 {
     match code {
         .access_request     { return host.auth_port }
         .accounting_request { return host.acct_port }
@@ -67,7 +67,7 @@ pub fn (host Host) dictionary() Dictionary {
 }
 
 // Returns VALUE from dictionary with given attribute & value name
-pub fn (host Host) dictionary_value_by_attr_and_value_name(attr_name string, value_name string) ?DictionaryValue {
+pub fn (host Host) dictionary_value_by_attr_and_value_name(attr_name string, value_name string) !DictionaryValue {
     for value in host.dictionary.values() {
         if value.name() == value_name && value.attribute_name() == attr_name {
             return value
@@ -77,7 +77,7 @@ pub fn (host Host) dictionary_value_by_attr_and_value_name(attr_name string, val
 }
 
 // Returns ATTRIBUTE from dictionary with given id
-pub fn (host Host) dictionary_attribute_by_id(packet_attr_id u8) ?DictionaryAttribute {
+pub fn (host Host) dictionary_attribute_by_id(packet_attr_id u8) !DictionaryAttribute {
     for attr in host.dictionary.attributes() {
         if attr.code() == packet_attr_id {
             return attr
@@ -87,7 +87,7 @@ pub fn (host Host) dictionary_attribute_by_id(packet_attr_id u8) ?DictionaryAttr
 }
 
 // Returns ATTRIBUTE from dictionary with given name
-pub fn (host Host) dictionary_attribute_by_name(packet_attr_name string) ?DictionaryAttribute {
+pub fn (host Host) dictionary_attribute_by_name(packet_attr_name string) !DictionaryAttribute {
     for attr in host.dictionary.attributes() {
         if attr.name() == packet_attr_name {
             return attr
@@ -97,7 +97,7 @@ pub fn (host Host) dictionary_attribute_by_name(packet_attr_name string) ?Dictio
 }
 
 // Initialises RadiusPacket from bytes
-pub fn (host Host) initialise_packet_from_bytes(packet []u8) ?RadiusPacket {
+pub fn (host Host) initialise_packet_from_bytes(packet []u8) !RadiusPacket {
     return initialise_radius_packet_from_bytes(host.dictionary, packet)
 }
 
@@ -105,13 +105,13 @@ pub fn (host Host) initialise_packet_from_bytes(packet []u8) ?RadiusPacket {
 //
 // Note: doesn't verify Message-Authenticator attribute, because it is HMAC-MD5 hash, not an
 // ASCII string
-pub fn (host Host) verify_packet_attributes(packet []u8) ?bool {
+pub fn (host Host) verify_packet_attributes(packet []u8) !bool {
     ignore_attribute := "Message-Authenticator"
-    packet_tmp       := initialise_radius_packet_from_bytes(host.dictionary, packet)?
+    packet_tmp       := initialise_radius_packet_from_bytes(host.dictionary, packet)!
 
     for packet_attr in packet_tmp.attributes() {
         if packet_attr.name() != ignore_attribute {
-            dict_attr           := host.dictionary_attribute_by_id(packet_attr.id())?
+            dict_attr           := host.dictionary_attribute_by_id(packet_attr.id())!
             dict_attr_data_type := dict_attr.code_type()
 
             if _verify := packet_attr.verify_original_value(dict_attr_data_type) {
@@ -125,9 +125,9 @@ pub fn (host Host) verify_packet_attributes(packet []u8) ?bool {
 }
 
 // Verifies Message-Authenticator value
-pub fn (host Host) verify_message_authenticator(secret string, packet []u8) ?bool {
-    packet_tmp      := initialise_radius_packet_from_bytes(host.dictionary, packet)?
-    packet_msg_auth := packet_tmp.message_authenticator()?
+pub fn (host Host) verify_message_authenticator(secret string, packet []u8) !bool {
+    packet_tmp      := initialise_radius_packet_from_bytes(host.dictionary, packet)!
+    packet_msg_auth := packet_tmp.message_authenticator()!
 
     hash := hmac.new(secret.bytes(), packet, md5.sum, md5.block_size)
 

@@ -91,13 +91,13 @@ pub fn (dict_value DictionaryValue) value() string {
 
 // Implement functions for Dictionary struct
 // Creates Dictionary from a RADIUS dictionary file
-pub fn dict_from_file(file_path string) ? Dictionary {
+pub fn dict_from_file(file_path string) !Dictionary {
     mut attributes  := []DictionaryAttribute{}
     mut values      := []DictionaryValue{}
     mut vendors     := []DictionaryVendor{}
     mut vendor_name := ""
 
-    contents := os.read_lines(file_path)?
+    contents := os.read_lines(file_path)!
 
     lines := contents
       .filter(it.len_utf8() > 0)
@@ -135,7 +135,7 @@ pub fn (dict Dictionary) vendors() []DictionaryVendor {
 
 
 // Helper functions
-fn assign_attribute_type(code_type string) ? SupportedAttributeTypes {
+fn assign_attribute_type(code_type string) ?SupportedAttributeTypes {
     match code_type {
         "string"     { return SupportedAttributeTypes.ascii_string }
         "integer"    { return SupportedAttributeTypes.integer }

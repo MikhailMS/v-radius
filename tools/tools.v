@@ -56,7 +56,7 @@ pub fn bytes_to_ipv6_string(ipv6 []u8) ?string {
 // Converts IPv4 Address string into vector of bytes
 //
 // Should be used for any Attribute of type **ipaddr** to ensure value is encoded correctly
-pub fn ipv4_string_to_bytes(ipv4 string) ?[]u8 {
+pub fn ipv4_string_to_bytes(ipv4 string) ![]u8 {
     if ipv4.contains("/") {
         return error('Subnets are not supported for IPv4: $ipv4')
     }
@@ -72,7 +72,7 @@ pub fn ipv4_string_to_bytes(ipv4 string) ?[]u8 {
 }
 
 // Converts IPv4 bytes into IPv4 string
-pub fn bytes_to_ipv4_string(ipv4 []u8) ?string {
+pub fn bytes_to_ipv4_string(ipv4 []u8) !string {
     if ipv4.len != 4 {
         return error('Malformed IPv4: $ipv4')
     }
@@ -93,7 +93,7 @@ pub fn integer_to_bytes(integer u32) []u8 {
 }
 
 // Converts integer bytes into u32
-pub fn bytes_to_integer(integer []u8) ?u32 {
+pub fn bytes_to_integer(integer []u8) u32 {
     mut result := u32(0)
     for i in 0..4 {
         result = (result << 8) | integer[i]
@@ -119,7 +119,7 @@ pub fn timestamp_to_bytes(timestamp u64) []u8 {
 }
 
 // Converts timestamp bytes into u64
-pub fn bytes_to_timestamp(timestamp []u8) ?u64 {
+pub fn bytes_to_timestamp(timestamp []u8) u64 {
     mut result := u64(0)
     for i in 0..8 {
         result = (result << 8) | timestamp[i]
@@ -176,11 +176,11 @@ pub fn decrypt_data(data []u8, authenticator []u8, secret []u8) []u8 {
     mut prev_result := authenticator.clone()
 
     for data_chunk in arrays.chunk(data, 16) {
-        mut md5  := md5.new()
-        md5.write(secret) or {}
-        md5.write(prev_result) or {}
+        mut md5_hash  := md5.new()
+        md5_hash.write(secret) or {}
+        md5_hash.write(prev_result) or {}
 
-        hash = md5.checksum()
+        hash = md5_hash.checksum()
 
         for i in 0..16 {
           hash[i] ^= data_chunk[i]
@@ -231,7 +231,7 @@ pub fn salt_encrypt_data(data []u8, authenticator []u8, salt []u8, secret []u8) 
 /// Decrypts data with salt since RADIUS packet is sent in plain text
 ///
 /// Should be used for RADIUS Tunnel-Password Attribute
-pub fn salt_decrypt_data(data []u8, authenticator []u8, secret []u8) ?[]u8 {
+pub fn salt_decrypt_data(data []u8, authenticator []u8, secret []u8) ![]u8 {
     /*
      * The salt decryption behaves almost the same as normal Password encryption in RADIUS
      * The main difference is the presence of a two byte salt, which is appended to the authenticator
@@ -253,10 +253,10 @@ pub fn salt_decrypt_data(data []u8, authenticator []u8, secret []u8) ?[]u8 {
     mut prev_result := salted_authenticator.clone()
 
     for data_chunk in arrays.chunk(data[2..], 16) {
-        mut md5 := md5.new()
-        md5.write(secret)  or { 0 }
-        md5.write(prev_result) or { 0 }
-        hash = md5.checksum()
+        mut md5_hash := md5.new()
+        md5_hash.write(secret)  or { 0 }
+        md5_hash.write(prev_result) or { 0 }
+        hash = md5_hash.checksum()
 
         for i in 0..16 {
           hash[i] ^= data_chunk[i]
@@ -283,14 +283,14 @@ fn encrypt_helper(mut output []u8, mut data []u8, authenticator []u8, mut hash [
     mut tmp       := []u8{}
 
     for {
-        mut md5 := md5.new()
-        md5.write(secret) or { 0 }
+        mut md5_hash := md5.new()
+        md5_hash.write(secret) or { 0 }
         if iteration == 1 {
-          md5.write(authenticator) or { 0 }
+          md5_hash.write(authenticator) or { 0 }
         } else {
-          md5.write(tmp) or { 0 }
+          md5_hash.write(tmp) or { 0 }
         }
-        hash = md5.checksum()
+        hash = md5_hash.checksum()
 
         iteration += 1
 

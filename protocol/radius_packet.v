@@ -72,7 +72,7 @@ pub struct RadiusPacket {
 
 // Implement functions for TypeCode struct
 // Convert integer(u8) value into corresponding TypeCode enum
-pub fn type_code_from_u8(code u8) ?TypeCode {
+pub fn type_code_from_u8(code u8) !TypeCode {
     match code {
         1  { return TypeCode.access_request }
         2  { return TypeCode.access_accept }
@@ -117,7 +117,7 @@ pub fn (type_code TypeCode) to_u8() u8 {
 // Implement functions for RadiusAttribute struct
 // Creates RadiusAttribute with given name
 // Returns None, if ATTRIBUTE with such name is not found in Dictionary
-pub fn create_radius_attribute_by_name(dictionary Dictionary, attribute_name string, value []u8) ?RadiusAttribute {
+pub fn create_radius_attribute_by_name(dictionary Dictionary, attribute_name string, value []u8) !RadiusAttribute {
     for attribute in dictionary.attributes() {
       if attribute.name() == attribute_name {
         return RadiusAttribute {
@@ -134,7 +134,7 @@ pub fn create_radius_attribute_by_name(dictionary Dictionary, attribute_name str
 // Creates RadiusAttribute with given id
 //
 // Returns None, if ATTRIBUTE with such id is not found in Dictionary
-pub fn create_radius_attribute_by_id(dictionary Dictionary, attribute_code u8, value []u8) ?RadiusAttribute {
+pub fn create_radius_attribute_by_id(dictionary Dictionary, attribute_code u8, value []u8) !RadiusAttribute {
     for attribute in dictionary.attributes() {
       if attribute.code() == attribute_code {
         return RadiusAttribute {
@@ -170,7 +170,7 @@ pub fn (rad_attr RadiusAttribute) name() string {
 }
 
 // Verifies RadiusAttribute value, based on the ATTRIBUTE code type
-pub fn (rad_attr RadiusAttribute) verify_original_value(allowed_type SupportedAttributeTypes) ?bool {
+pub fn (rad_attr RadiusAttribute) verify_original_value(allowed_type SupportedAttributeTypes) !bool {
     match allowed_type {
         .ascii_string {
           mut builder := strings.new_builder(10)
@@ -204,25 +204,19 @@ pub fn (rad_attr RadiusAttribute) verify_original_value(allowed_type SupportedAt
             }
         }
         .integer      {
-            if _valid := tools.bytes_to_integer(rad_attr.value()) {
-                return true
-            } else {
-                return error('invalid Integer bytes')
-            }
+            valid := tools.bytes_to_integer(rad_attr.value())
+            return true
         }
         .date         {
-            if _valid := tools.bytes_to_timestamp(rad_attr.value()) {
-                return true
-            } else {
-                return error('invalid Date bytes')
-            }
+            valid := tools.bytes_to_timestamp(rad_attr.value())
+            return true
         }
     }
 }
 
 // Returns RadiusAttribute value, if the attribute is dictionary's ATTRIBUTE with code type string, ipaddr,
 // ipv6addr or aipv6prefix
-pub fn (rad_attr RadiusAttribute) original_string_value(allowed_type SupportedAttributeTypes) ?string {
+pub fn (rad_attr RadiusAttribute) original_string_value(allowed_type SupportedAttributeTypes) !string {
     match allowed_type {
         .ascii_string {
           mut builder := strings.new_builder(10)
@@ -261,21 +255,15 @@ pub fn (rad_attr RadiusAttribute) original_string_value(allowed_type SupportedAt
 
 /// Returns RadiusAttribute value, if the attribute is dictionary's ATTRIBUTE with code type
 /// integer of date
-pub fn (rad_attr RadiusAttribute) original_integer_value(allowed_type SupportedAttributeTypes) ?u64 {
+pub fn (rad_attr RadiusAttribute) original_integer_value(allowed_type SupportedAttributeTypes) !u64 {
     match allowed_type {
         .integer      {
-            if valid := tools.bytes_to_integer(rad_attr.value()) {
-                return u64(valid)
-            } else {
-                return error('invalid Integer bytes')
-            }
+            valid := tools.bytes_to_integer(rad_attr.value())
+            return u64(valid)
         }
         .date         {
-            if valid := tools.bytes_to_timestamp(rad_attr.value()) {
-                return valid
-            } else {
-                return error('invalid Date bytes')
-            }
+            valid := tools.bytes_to_timestamp(rad_attr.value())
+            return valid
         }
         else { return error('not an Integer data type') }
     }
@@ -312,7 +300,7 @@ pub fn initialise_radius_packet(code TypeCode) RadiusPacket {
 }
 
 // Initialises RADIUS packet from raw bytes
-pub fn initialise_radius_packet_from_bytes(dictionary Dictionary, bytes []u8) ?RadiusPacket {
+pub fn initialise_radius_packet_from_bytes(dictionary Dictionary, bytes []u8) !RadiusPacket {
     code           := type_code_from_u8(bytes[0]) or { return error('Invalid TypeCode: $bytes[0]') }
     id             := bytes[1]
     authenticator  := bytes[4..20]
@@ -326,7 +314,7 @@ pub fn initialise_radius_packet_from_bytes(dictionary Dictionary, bytes []u8) ?R
         attr_value  := bytes[(last_index + 2)..(last_index + attr_length)]
 
         if rad_attribute := create_radius_attribute_by_id(dictionary, attr_id, attr_value) {
-            attributes.push(rad_attribute)
+            attributes << rad_attribute
             last_index += attr_length
         } else {
             return error('attribute with ID: $attr_id is not found in dictionary')
@@ -364,7 +352,7 @@ pub fn (mut rad_packet RadiusPacket) override_authenticator(new_authenticator []
 // Overrides RadiusPacket Message-Authenticator
 //
 // Note: would fail if RadiusPacket has no Message-Authenticator attribute defined
-pub fn (mut rad_packet RadiusPacket) override_message_authenticator(new_message_authenticator []u8) ?bool {
+pub fn (mut rad_packet RadiusPacket) override_message_authenticator(new_message_authenticator []u8) !bool {
     for mut attribute in rad_packet.attributes {
         if attribute.name() == "Message-Authenticator" {
             attribute.override_value(new_message_authenticator)
@@ -376,7 +364,7 @@ pub fn (mut rad_packet RadiusPacket) override_message_authenticator(new_message_
 }
 
 // Returns Message-Authenticator value, if exists in RadiusPacket
-pub fn (rad_packet RadiusPacket) message_authenticator() ?[]u8 {
+pub fn (rad_packet RadiusPacket) message_authenticator() ![]u8 {
     for attribute in rad_packet.attributes {
         if attribute.name() == "Message-Authenticator" {
             return attribute.value()
@@ -407,7 +395,7 @@ pub fn (rad_packet RadiusPacket) attributes() []RadiusAttribute {
 }
 
 // Returns RadiusAttribute with given name
-pub fn (rad_packet RadiusPacket) attribute_by_name(name string) ?RadiusAttribute {
+pub fn (rad_packet RadiusPacket) attribute_by_name(name string) !RadiusAttribute {
     for attribute in rad_packet.attributes {
         if attribute.name() == name {
             return attribute
@@ -418,7 +406,7 @@ pub fn (rad_packet RadiusPacket) attribute_by_name(name string) ?RadiusAttribute
 }
 
 // Returns RadiusAttribute with given id
-pub fn (rad_packet RadiusPacket) attribute_by_id(id u8) ?RadiusAttribute {
+pub fn (rad_packet RadiusPacket) attribute_by_id(id u8) !RadiusAttribute {
     for attribute in rad_packet.attributes {
         if attribute.id() == id {
             return attribute

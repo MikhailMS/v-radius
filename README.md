@@ -16,4 +16,4 @@ vlang dictionary_test.v -stats
 ```
 
 ## Notes
-1. Development is done against `V of version 0.3.0 5f140fe`
+1. Development is done against `V of version 0.4.2 9051ac8`
