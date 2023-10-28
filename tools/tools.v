@@ -2,14 +2,22 @@ module tools
 
 import arrays
 import crypto.md5
+import net
+import strconv
 
 // Converts IPv6 Address string into vector of bytes
 //
 // Should be used for any Attribute of type **ipv6addr** or **ipv6prefix** to ensure value is encoded correctly
 pub fn ipv6_string_to_bytes(ipv6 string) ?[]u8 {
-//     parsed_ipv6 := ipv6.split("/")
-//     mut bytes   := [18]u8
-//     ipv6_address           = Ipv6Addr::from_str(parsed_ipv6[0]).map_err(|error| RadiusError::MalformedIpAddrError { error: error.to_string() })?;
+  // TODO
+  // mut bytes   := []u8{ cap: 18 }
+  // parsed_ipv6 := ipv6.split("/")
+
+  // if parsed_ipv6.len == 2 {
+  //   // Parse netmask
+  // }
+
+  // ipv6_address           = Ipv6Addr::from_str(parsed_ipv6[0]).map_err(|error| RadiusError::MalformedIpAddrError { error: error.to_string() })?;
 
 //     if parsed_ipv6.len() == 2 {
 //         bytes.append( &mut u16_to_be_bytes(parsed_ipv6[1].parse::<u16>().unwrap()).to_vec() )
@@ -22,6 +30,7 @@ pub fn ipv6_string_to_bytes(ipv6 string) ?[]u8 {
 
 // Converts IPv6 bytes into IPv6 string
 pub fn bytes_to_ipv6_string(ipv6 []u8) ?string {
+  // TODO
 //     if ipv6.len() == 18 {
 //         // Case with subnet
 //         let subnet = u16_from_be_bytes(&ipv6[0..2]);
@@ -55,17 +64,25 @@ pub fn bytes_to_ipv6_string(ipv6 []u8) ?string {
 
 // Converts IPv4 Address string into vector of bytes
 //
-// Should be used for any Attribute of type **ipaddr** to ensure value is encoded correctly
+// Should be used for any Attribute of type **ipaddr**, **ipv4addr** or **ipv4prefix** to ensure value is encoded correctly
 pub fn ipv4_string_to_bytes(ipv4 string) ![]u8 {
-    if ipv4.contains("/") {
-        return error('Subnets are not supported for IPv4: $ipv4')
+    mut bytes := []u8{}
+
+    processed_ipv4 := ipv4.trim_space().split("/")
+
+    if processed_ipv4.len == 2 {
+      subnet_number := strconv.parse_uint(processed_ipv4[1], 10, 8) or { return error('IPv4 Subnet must be in the range [0, 32], you provided ${processed_ipv4[1]}') }
+
+      if subnet_number > 32 {
+        return error('IPv4 Subnet must be in the range [0, 32], you provided ${subnet_number}')
+      }
+
+      bytes << u8(0)
+      bytes << u8(subnet_number & 0xff)
     }
 
-    mut bytes := []u8{}
-    mut index := 0
     for group in ipv4.trim_space().split(".").map(it.u8()) {
-        bytes.insert(index, group)
-        index += 1
+      bytes << group
     }
 
     return bytes
@@ -73,11 +90,52 @@ pub fn ipv4_string_to_bytes(ipv4 string) ![]u8 {
 
 // Converts IPv4 bytes into IPv4 string
 pub fn bytes_to_ipv4_string(ipv4 []u8) !string {
-    if ipv4.len != 4 {
-        return error('Malformed IPv4: $ipv4')
+    match ipv4.len {
+      6 {
+        if ipv4[1] > 32 {
+          return error("IPv4 Subnet must be no greater than 32, but bytes provided ${ipv4[1]}")
+        }
+
+        subnet_string := ipv4[1].str()
+        ipv4_string   := ipv4[2..].map(it.str()).join(".")
+
+        return ipv4_string + "/" + subnet_string
+      }
+      4 { return ipv4.map(it.str()).join(".") }
+      else { return error('Malformed IPv4: ${ipv4}') }
     }
 
-    return ipv4.map(it.str()).join(".")
+    return error('Malformed IPv4: ${ipv4}')
+}
+
+// Converts Ifid (Interface Id) string into vector of bytes
+//
+// Assumes that Interface Id string is in format 0000:0000:0000:0000
+//
+// Should be used for any Attribute of type **ifid** to ensure value is encoded correctly
+pub fn interfaceid_string_to_bytes(ifid string) []u8 {
+  // TODO
+  return []u8
+}
+
+// Converts **ifid** bytes into String
+pub fn bytes_to_interfaceid_string(ifid []u8) string {
+  // TODO
+  return ""
+}
+
+// Converts u64 into vector of bytes
+//
+// Should be used for any Attribute of type **integer64** to ensure value is encoded correctly
+pub fn integer64_to_bytes(integer u64) []u8 {
+  // TODO
+  return []u8
+}
+
+// Converts **integer64** bytes into u64
+pub fn bytes_to_integer64(integer []u8) u64 {
+  // TODO
+  return 0
 }
 
 // Converts u32 into vector of bytes
@@ -106,6 +164,7 @@ pub fn bytes_to_integer(integer []u8) u32 {
 //
 // Should be used for any Attribute of type **date** to ensure value is encoded correctly
 pub fn timestamp_to_bytes(timestamp u64) []u8 {
+  // TODO
     b1 := u8((timestamp >> 56) & 0xff)
     b2 := u8((timestamp >> 48) & 0xff)
     b3 := u8((timestamp >> 40) & 0xff)
@@ -120,6 +179,7 @@ pub fn timestamp_to_bytes(timestamp u64) []u8 {
 
 // Converts timestamp bytes into u64
 pub fn bytes_to_timestamp(timestamp []u8) u64 {
+  // TODO
     mut result := u64(0)
     for i in 0..8 {
         result = (result << 8) | timestamp[i]
@@ -311,12 +371,4 @@ fn encrypt_helper(mut output []u8, mut data []u8, authenticator []u8, mut hash [
         if data.len == 0 { break }
     }
 }
-
-// fn u16_to_be_bytes(u16_data u16) -> [u8;2] {
-//     u16_data.to_be_bytes()
-// }
-
-// fn u16_from_be_bytes(bytes: &[u8]) -> u16 {
-//     u16::from_be_bytes(bytes.try_into().expect("slice with incorrect length"))
-// }
 // -----------------------------------------

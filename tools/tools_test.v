@@ -28,6 +28,29 @@ fn test_ipv4_string_to_bytes() {
     assert ipv4_bytes == [u8(192), 1, 10, 1]
 }
 
+fn test_ipv4_string_w_subnet_to_bytes() {
+    ipv4_bytes := ipv4_string_to_bytes("192.1.10.1/32") or { []u8{} }
+
+    assert ipv4_bytes == [u8(0), 32, 192, 1, 10, 1]
+}
+
+fn test_ipv4_string_w_negative_subnet_to_bytes() {
+    if ipv4_bytes := ipv4_string_to_bytes("192.1.10.1/-1") {
+      assert false
+    } else {
+      assert err.str() == "IPv4 Subnet must be in the range [0, 32], you provided -1"
+    }
+}
+
+fn test_ipv4_string_w_big_subnet_to_bytes() {
+    if ipv4_bytes := ipv4_string_to_bytes("192.1.10.1/33") {
+      assert false
+    } else {
+      assert err.str() == "IPv4 Subnet must be in the range [0, 32], you provided 33"
+    }
+}
+
+
 fn test_ipv4_bytes_to_string() {
     ipv4_string := bytes_to_ipv4_string([u8(192), 1, 10, 1]) or { "" }
 
